@@ -118,6 +118,8 @@
   const on = (sel, ev, fn) => $$(sel).forEach(el => el.addEventListener(ev, fn));
   const field = (id, label, value, opts) => { opts = opts || {}; return `<label class="field${opts.compact ? ' compact' : ''}" for="${id}"><span class="label">${esc(label)}</span><span class="in">${opts.nosym ? '' : `<span class="sym" aria-hidden="true">${esc(sym())}</span>`}<input id="${id}" type="number" inputmode="decimal" enterkeyhint="${opts.enter || 'next'}" step="${opts.step || '0.01'}" ${opts.min !== undefined ? `min="${opts.min}"` : ''} ${opts.max !== undefined ? `max="${opts.max}"` : ''} placeholder="${esc(opts.ph || '0')}" value="${value === null || value === undefined ? '' : esc(value)}"></span>${opts.hint ? `<span class="hint">${esc(opts.hint)}</span>` : ''}</label>`; };
   const val = id => E.num(document.getElementById(id) && document.getElementById(id).value);
+  const focusChoices = () => E.FOCUS.map(o => `<button class="choice" type="button" data-focus="${o.key}" aria-pressed="${state.focus === o.key ? 'true' : 'false'}"><span>${esc(o.label)}</span><span class="sub">${esc(o.sub)}</span></button>`).join('');
+
   const brand = `<div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3,17 8,13 12,15 17,8 21,5"/></svg>The Line</div>`;
 
   /* ---------- onboarding: two questions, or none ---------- */
@@ -142,13 +144,13 @@
       on('#obNext', 'click', () => { state.settings.payday.day = parseInt($('#obDay').value, 10); state.settings.payday.irregular = $('#obVaries').getAttribute('aria-pressed') === 'true'; state.plan.irregular = state.settings.payday.irregular; if (!state.plan.transferDay) state.plan.transferDay = state.settings.payday.day >= 28 ? 1 : state.settings.payday.day + 1; save(); go('#/start?q=2'); });
       return;
     }
-    const opts = [['buffer', 'A first buffer', '€300–€500 in a separate account, so small emergencies stop going on a card.'], ['debt', 'Clearing a debt', 'One balance, attacked faster than the minimum.'], ['fund', 'The emergency fund', 'Three to six months of essentials, in stages.'], ['invest', 'Starting to invest', 'Money with no deadline, once the rest is in place.']];
+
     html(`<div class="screen">
       <div class="grow">${brand}
         <p class="eyebrow" style="margin-top:40px;">Two of two</p>
         <h1 class="title big">What are you working on?</h1>
         <p class="body dim">It sets which step you're on and what the home screen asks of you.</p>
-        <div class="choices" role="group" aria-label="What are you working on">${opts.map(o => `<button class="choice" type="button" data-focus="${o[0]}" aria-pressed="${state.focus === o[0] ? 'true' : 'false'}"><span>${o[1]}</span><span class="sub">${o[2]}</span></button>`).join('')}</div>
+        <div class="choices" role="group" aria-label="What are you working on">${focusChoices()}</div>
       </div>
       <div class="bottom"><button class="btn primary" type="button" id="obDone" ${state.focus ? '' : 'disabled'}>Next: your first reading</button><button class="btn ghost" type="button" id="obBack">Back</button></div>
     </div>`);
@@ -236,6 +238,7 @@
     const animate = last && state.lineAnimatedFor !== last.date;
     if (animate) { state.lineAnimatedFor = last.date; save(); }
     const exportNudge = state.createdAt && E.daysBetween(state.createdAt, today) >= 90 && !state.exportedAt;
+    const focusNow = E.focusLabel(state.focus || E.focusForStep(E.currentStep(state)));
     html(`<div class="screen"><div class="grow">
       <p class="eyebrow">Net worth${last ? ' · ' + esc(E.shortDate(last.date)) : ''}</p>
       ${last ? `<p class="hero-num">${f(last.total)}</p>` : `<p class="hero-num dim">—</p>`}
@@ -246,6 +249,7 @@
       ${exportNudge ? `<div class="note"><span>Three months of history now lives only on this phone. Worth an export.</span><a class="link act" href="#/settings">Export a copy</a></div>` : ''}
     </div>
     <div class="bottom">
+      <p class="caption" style="margin-bottom:8px;">${focusNow ? `Working on ${esc(focusNow.toLowerCase())} · <a class="link" href="#/plan">change</a>` : `<a class="link" href="#/plan">Choose what you're working on</a>`}</p>
       <p class="body" style="margin-bottom:${act.label ? '12px' : '0'};">${esc(act.text)}</p>
       ${act.label ? `<button class="btn ${act.kind === 'payday' || act.kind === 'check' ? 'primary' : ''}" type="button" data-go="${act.route}">${esc(act.label)}</button>` : ''}
     </div></div>`);
@@ -326,8 +330,16 @@
     const p = state.plan, m = state.method;
     const target = E.savingsTarget(state), left = E.leftForVariable(state), imp = E.impossibility(state);
     const stepOpts = E.STEPS.map(s => `<option value="${s.n}" ${String(p.step) === String(s.n) ? 'selected' : ''}>Step ${s.n} — ${esc(s.short)}</option>`).join('');
+    const stepNow = E.currentStep(state);
+    const stepNote = stepNow !== null && E.STEPS[stepNow] ? E.STEPS[stepNow].does + '. ' + E.STEPS[stepNow].why : 'Pick one and the home screen starts asking for that.';
     html(`<div class="screen"><div class="grow">
       <p class="eyebrow">Plan</p><h1 class="title">One page. Boring on purpose.</h1>
+      <div class="section"><h2>Working on now</h2>
+        <p class="caption" style="margin-bottom:10px;">This sets which step you're on and what the home screen asks of you. Change it whenever the answer changes — nothing resets.</p>
+        <div class="choices" role="group" aria-label="What you're working on">${focusChoices()}</div>
+        <label class="field" for="plStep" style="margin-top:14px;"><span class="label">Order-of-operations step</span><span class="in"><select id="plStep"><option value="">— not set —</option>${stepOpts}</select></span></label>
+        <p class="caption" id="plStepNote">${esc(stepNote)}</p>
+      </div>
       <div class="section"><h2>Method</h2>
         <div class="seg" role="group" aria-label="Budgeting method">${Object.keys(E.METHODS).map(k => `<button type="button" data-method="${k}" aria-pressed="${m === k ? 'true' : 'false'}">${esc(E.METHODS[k])}</button>`).join('')}</div>
         <p class="caption" style="margin-top:8px;">Changing method isn't starting over. The line, the fund, the streak of real actions — all of it carries across.</p>
@@ -351,12 +363,28 @@
         <div class="grid2"><label class="field" for="plGoalDate"><span class="label">By</span><span class="in"><input id="plGoalDate" type="text" value="${esc(p.goal.date)}" placeholder="June 2027" autocomplete="off"></span></label>
         <label class="field" for="plGoalWhy"><span class="label">Because</span><span class="in"><input id="plGoalWhy" type="text" value="${esc(p.goal.why)}" placeholder="a real safety net" autocomplete="off"></span></label></div>
       </div>
-      <div class="section"><h2>Where you are</h2>
-        <label class="field" for="plStep"><span class="label">Order-of-operations step</span><span class="in"><select id="plStep"><option value="">— not set —</option>${stepOpts}</select></span></label>
+      <div class="section"><h2>Protection and review</h2>
         <label class="field" for="plGap"><span class="label">Protection gap still to close</span><span class="in"><input id="plGap" type="text" value="${esc(p.gap)}" placeholder="e.g. income protection — check employer first" autocomplete="off"></span></label>
         <label class="field" for="plReview"><span class="label">Next review</span><span class="in"><input id="plReview" type="date" value="${esc(p.reviewDate)}"></span></label>
       </div>
     </div><div class="bottom"><button class="btn primary" type="button" id="plSave">Save plan</button></div></div>`);
+    const syncFocusUi = () => {
+      $$('[data-focus]').forEach(c => c.setAttribute('aria-pressed', c.getAttribute('data-focus') === state.focus ? 'true' : 'false'));
+      const n = E.currentStep(state), note = $('#plStepNote');
+      if (note) note.textContent = n !== null && E.STEPS[n] ? E.STEPS[n].does + '. ' + E.STEPS[n].why : 'Pick one and the home screen starts asking for that.';
+    };
+    on('[data-focus]', 'click', e => {
+      state.focus = e.currentTarget.getAttribute('data-focus');
+      state.plan.step = E.FOCUS_STEP[state.focus];
+      $('#plStep').value = String(state.plan.step);
+      save(); syncFocusUi();
+      toast('Working on ' + E.focusLabel(state.focus).toLowerCase() + '. Nothing was reset.');
+    });
+    on('#plStep', 'change', e => {
+      state.plan.step = e.target.value === '' ? null : parseInt(e.target.value, 10);
+      state.focus = E.focusForStep(state.plan.step);
+      save(); syncFocusUi();
+    });
     on('[data-method]', 'click', e => { state.method = e.currentTarget.getAttribute('data-method'); save(); toast('Method: ' + E.METHODS[state.method] + '. Nothing was reset.'); render(); });
     on('[data-explain]', 'click', e => openSheet(e.currentTarget.getAttribute('data-explain')));
     on('#plSave', 'click', () => {

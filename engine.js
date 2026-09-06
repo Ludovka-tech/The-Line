@@ -15,7 +15,23 @@
     { n: 6, does: 'Invest for long-term goals', short: 'long-term investing', why: 'Money with no deadline, in a low-cost diversified form you understand.', action: 'Write down your time horizon and your three weighted criteria.' },
     { n: 7, does: 'Save separately for dated goals', short: 'dated goals', why: "Anything needed inside a few years doesn't belong in volatile assets.", action: 'Give each dated goal its own account with a date on it.' }
   ];
-  var FOCUS_STEP = { buffer: 1, debt: 3, fund: 4, invest: 6 };
+  var FOCUS = [
+    { key: 'buffer', step: 1, label: 'A first buffer', sub: 'A few hundred in a separate account, so small emergencies stop going on a card.' },
+    { key: 'debt', step: 3, label: 'Clearing a debt', sub: 'One balance, attacked faster than the minimum.' },
+    { key: 'fund', step: 4, label: 'The emergency fund', sub: 'Three to six months of essentials, in stages.' },
+    { key: 'invest', step: 6, label: 'Starting to invest', sub: 'Money with no deadline, once the rest is in place.' }
+  ];
+  var FOCUS_STEP = {}; FOCUS.forEach(function (f) { FOCUS_STEP[f.key] = f.step; });
+  function focusLabel(key) { for (var i = 0; i < FOCUS.length; i++) if (FOCUS[i].key === key) return FOCUS[i].label; return null; }
+  /* the nearest focus for a hand-picked step, so the two never disagree */
+  function focusForStep(n) {
+    if (n === null || n === undefined || n === '') return null;
+    n = parseInt(n, 10);
+    if (n <= 1) return 'buffer';
+    if (n <= 3) return 'debt';
+    if (n <= 5) return 'fund';
+    return 'invest';
+  }
   var METHODS = { pyf: 'Pay yourself first', '503020': '50 / 30 / 20', zero: 'Zero-based' };
   var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -231,6 +247,6 @@
     }
   }
 
-  NB.engine = { STEPS: STEPS, METHODS: METHODS, DAYS: DAYS, FOCUS_STEP: FOCUS_STEP, round2: round2, fmt: fmt, num: num, pct: pct, ordinal: ordinal, daysBetween: daysBetween, addMonths: addMonths, shortDate: shortDate, monthLabel: monthLabel,
+  NB.engine = { STEPS: STEPS, METHODS: METHODS, DAYS: DAYS, FOCUS_STEP: FOCUS_STEP, FOCUS: FOCUS, focusLabel: focusLabel, focusForStep: focusForStep, round2: round2, fmt: fmt, num: num, pct: pct, ordinal: ordinal, daysBetween: daysBetween, addMonths: addMonths, shortDate: shortDate, monthLabel: monthLabel,
     savingsTarget: savingsTarget, leftForVariable: leftForVariable, impossibility: impossibility, paydayDue: paydayDue, weeklyDue: weeklyDue, nwDue: nwDue, rematchDue: rematchDue, nextAction: nextAction, currentStep: currentStep, fitSignals: fitSignals, observation: observation, readingTotals: readingTotals, change: change, changeText: changeText, encouragement: encouragement, efStages: efStages, payoff: payoff, debtSpeed: debtSpeed, explain: explain };
 })(window);
