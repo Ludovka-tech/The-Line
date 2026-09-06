@@ -487,7 +487,7 @@
         <p class="body small dim">The companion to the course. It shows up at the moments money decisions happen, asks for one thing, and remembers the answer. <a class="link" href="https://financial-literacy-course.netlify.app/">Back to the course</a></p>
         <p class="caption">Education, not financial advice — <a class="link" href="https://financial-literacy-course.netlify.app/disclaimer.html">the full disclaimer</a>.</p>
         <p class="caption"><a class="link" href="https://financial-literacy-course.netlify.app/privacy.html">Privacy Policy</a> · <a class="link" href="mailto:themoneynotebook8@gmail.com">themoneynotebook8@gmail.com</a> · <a class="link" href="https://instagram.com/the_money.notebook" rel="me noopener">@the_money.notebook</a></p>
-        <p class="caption">© 2026 the money notebook</p>
+        <p class="caption">© 2026 the money notebook, Kristián Mesík</p>
       </div>
     </div></div>`);
     on('#stPayday', 'change', e => { s.payday.day = parseInt(e.target.value, 10); save(); });
