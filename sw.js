@@ -2,7 +2,7 @@
 const VERSION = 'the-line-v1';
 const PRECACHE = [
   './', './index.html', './app.css', './app.js', './store.js', './engine.js',
-  './country-config.js', './manifest.webmanifest',
+  './country-config.js', './analytics.js', './manifest.webmanifest',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-512.png', './icons/apple-touch-icon.png',
   './fonts/plex-mono-400-latin.woff2', './fonts/plex-mono-400-latin-ext.woff2',

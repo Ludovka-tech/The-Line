@@ -110,6 +110,7 @@
     tabbar.hidden = !state.onboarded || ['start', 'import', 'payday', 'rematch'].includes(name);
     tabbar.querySelectorAll('a').forEach(a => { const tab = a.getAttribute('data-tab'); const on = tab === name || (tab === 'home' && name === 'networth') || (tab === 'settings' && ['reminders', 'about'].includes(name)); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     updateSparkIcon();
+    if (window.flTrack) window.flTrack('app-screen', { screen: name });
   }
   window.addEventListener('hashchange', render);
   const html = s => { view.innerHTML = s; };
@@ -477,14 +478,16 @@
           <button class="row tap" type="button" id="stCsv"><span class="k">Export as CSV<small>readings, checks, paydays</small></span><span class="chev">↓</span></button>
           <button class="row tap" type="button" id="stDelete"><span class="k" style="color:var(--down)">Delete everything<small>actually deletes — there is no server copy</small></span><span class="chev">›</span></button>
         </div>
-        <p class="caption" style="margin-top:10px;">Financial data stays on this device. Nothing is sent anywhere. That also means a lost phone loses the history — export now and then.</p>
+        <p class="caption" style="margin-top:10px;">Financial data stays on this device; none of it is sent anywhere. The only thing that leaves is an anonymous, cookieless count of which screens get opened. A lost phone still loses the history — export now and then.</p>
       </div>
       <div class="section"><h2>Subscription</h2>
         <p class="body small dim">Free while it's in preview. When a subscription comes, cancelling will be exactly as easy as signing up, and this app will never earn a commission on anything you open or buy. It compares; it doesn't recommend.</p>
       </div>
       <div class="section"><h2>About</h2>
         <p class="body small dim">The companion to the course. It shows up at the moments money decisions happen, asks for one thing, and remembers the answer. <a class="link" href="https://financial-literacy-course.netlify.app/">Back to the course</a></p>
-        <p class="caption">Education, not financial advice.</p>
+        <p class="caption">Education, not financial advice — <a class="link" href="https://financial-literacy-course.netlify.app/disclaimer.html">the full disclaimer</a>.</p>
+        <p class="caption"><a class="link" href="https://financial-literacy-course.netlify.app/privacy.html">Privacy Policy</a> · <a class="link" href="mailto:themoneynotebook8@gmail.com">themoneynotebook8@gmail.com</a> · <a class="link" href="https://instagram.com/the_money.notebook" rel="me noopener">@the_money.notebook</a></p>
+        <p class="caption">© 2026 the money notebook</p>
       </div>
     </div></div>`);
     on('#stPayday', 'change', e => { s.payday.day = parseInt(e.target.value, 10); save(); });
