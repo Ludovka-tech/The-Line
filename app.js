@@ -467,7 +467,7 @@
   routes.check = query => {
     const light = query.light === '1';
     const method = state.method;
-    html(`<div class="screen"><div class="grow">
+    html(`<div class="screen dense"><div class="grow">
       <p class="eyebrow">Weekly check · ${esc(E.DAYS[new Date().getDay()])}</p>
       <h1 class="title">${light ? 'One number.' : 'Three numbers.'}</h1>
       <p class="body dim small">Rough is right. Round to the nearest ten.</p>

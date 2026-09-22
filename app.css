@@ -23,7 +23,7 @@
   --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --hand:"Caveat","Bradley Hand","Segoe Script",cursive;
-  --tab-h:calc(56px + env(safe-area-inset-bottom,0px));
+  --tab-h:calc(64px + env(safe-area-inset-bottom,0px));
   color-scheme:dark;
 }
 @media (prefers-color-scheme: light){
@@ -136,6 +136,7 @@ svg.line text{font-family:var(--mono);font-size:0.6471rem;fill:var(--text-dim);}
 
 /* inputs: big mono, number pad */
 .field{display:block;padding:14px 0;border-bottom:1px solid var(--line);}
+.screen.dense .field{padding:9px 0;}          /* the weekly check has five rows and must not need scrolling */
 .field:last-of-type{border-bottom:none;}
 .field .label{display:block;font-size:0.8824rem;color:var(--text-dim);margin-bottom:6px;}
 .field .hint{display:block;font-size:0.7647rem;color:var(--text-dim);margin-top:4px;}
@@ -226,13 +227,13 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
   border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
-.tabbar nav{max-width:430px;margin:0 auto;display:flex;height:56px;position:relative;}
+.tabbar nav{max-width:430px;margin:0 auto;display:flex;height:64px;position:relative;}
 .tabbar a{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  text-decoration:none;color:var(--text-dim);font-size:0.6471rem;font-weight:500;min-width:44px;
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  text-decoration:none;color:var(--text-dim);font-size:0.7059rem;font-weight:500;min-width:44px;
   position:relative;z-index:1;
 }
-.tabbar a svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.tabbar a svg{width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 .tabbar a[aria-current="page"]{color:var(--text);}
 .tabbar a .spark{stroke:var(--up);}
 .tabbar a[aria-current="page"] .spark{stroke:var(--up);stroke-width:2.4;}
