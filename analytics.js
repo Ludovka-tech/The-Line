@@ -12,7 +12,7 @@
 (function (global) {
   'use strict';
 
-  var WEBSITE_ID = 'PLACEHOLDER-WEBSITE-ID';
+  var WEBSITE_ID = '0e804d07-804f-40df-b85f-daefd20aced6';
   var SCRIPT_SRC = 'https://cloud.umami.is/script.js';
 
   /* Events fired before Umami finishes loading wait here. */
