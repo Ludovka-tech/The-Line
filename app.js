@@ -162,7 +162,7 @@
   const routes = {};
   const TAB_ORDER = ['home', 'check', 'plan', 'progress', 'settings'];
   const TAB_OF = { networth: 'home', reminders: 'settings', about: 'settings' };
-  let shownRoute = null, leaveT = null;
+  let shownRoute = null, shownStep = null, leaveT = null;
   function parse() {
     const h = location.hash || '#/home';
     const [path, q] = h.slice(1).split('?');
@@ -190,12 +190,17 @@
     movePill();
     countAll();
     fillAll();
-    shownRoute = name;
+    shownRoute = name; shownStep = query.q || '';
     if (window.flTrack) window.flTrack('app-screen', { screen: name });
   }
 
-  /* travel direction: where the incoming screen comes from, in px */
-  function travel(from, to) {
+  /* travel direction: where the incoming screen comes from, in px.
+     Onboarding's two questions are one route stepped by ?q=, so compare the step too. */
+  function travel(from, fromStep, to, toStep) {
+    if (from === to) {
+      const a = parseInt(fromStep, 10), b = parseInt(toStep, 10);
+      return (isNaN(a) || isNaN(b) || b > a) ? 8 : -8;
+    }
     const i = TAB_ORDER.indexOf(TAB_OF[from] || from), j = TAB_ORDER.indexOf(TAB_OF[to] || to);
     return (i < 0 || j < 0 || i === j || j > i) ? 8 : -8;
   }
@@ -208,10 +213,10 @@
   }
   function navigate() {
     const { path, query } = parse();
-    const next = routeName(path, query);
+    const next = routeName(path, query), nextStep = query.q || '';
     clearTimeout(leaveT);                        /* a re-tap cancels the exit in flight */
-    if (shownRoute === null || next === shownRoute) { render(); return; }
-    const dx = travel(shownRoute, next);
+    if (shownRoute === null || (next === shownRoute && nextStep === shownStep)) { render(); return; }
+    const dx = travel(shownRoute, shownStep, next, nextStep);
     view.classList.remove('rt-enter');
     const arrive = () => { view.classList.remove('rt-leave'); render(); playEnter(dx); };
     if (reduced()) { arrive(); return; }         /* opacity-only, no leave delay */
