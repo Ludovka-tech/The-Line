@@ -42,8 +42,6 @@
     s.src = SCRIPT_SRC;
     s.defer = true;
     s.setAttribute('data-website-id', WEBSITE_ID);
-    /* Honours the browser's Do Not Track setting. Remove this line to count those visits too. */
-    s.setAttribute('data-do-not-track', 'true');
     s.addEventListener('load', flush);
     document.head.appendChild(s);
   }
