@@ -83,6 +83,18 @@
   }
   const fillAll = () => $$('[data-bar]').forEach(fillBar);
 
+  /* The line draws itself the first time each screen shows it in a session, and again
+     whenever a new reading arrives. Revisiting a screen never replays it. */
+  const lineDrawn = {};
+  function shouldDrawLine(screen, last) {
+    if (!last) return false;
+    const fresh = state.lineAnimatedFor !== last.date;
+    if (!fresh && lineDrawn[screen]) return false;
+    lineDrawn[screen] = true;
+    if (fresh) { state.lineAnimatedFor = last.date; save(); }
+    return true;
+  }
+
   /* ---------- the line ---------- */
   function lineSVG(readings, opts) {
     opts = opts || {};
@@ -349,8 +361,7 @@
     const today = S.today(), r = state.readings, last = r[r.length - 1];
     const ch = E.changeText(r, sym()), act = E.nextAction(state, today), sig = E.fitSignals(state, today)[0];
     const enc = E.encouragement(state);
-    const animate = last && state.lineAnimatedFor !== last.date;
-    if (animate) { state.lineAnimatedFor = last.date; save(); }
+    const animate = shouldDrawLine('home', last);
     const exportNudge = state.createdAt && E.daysBetween(state.createdAt, today) >= 90 && !state.exportedAt;
     const focusNow = E.focusLabel(state.focus || E.focusForStep(E.currentStep(state)));
     html(`<div class="screen"><div class="grow">
@@ -524,8 +535,7 @@
     const r = state.readings, p = state.plan, ef = E.efStages(state), ds = E.debtSpeed(p.debt), step = E.currentStep(state);
     const first = r[0], last = r[r.length - 1];
     const pctEf = ef.next ? Math.min(100, ef.current / ef.next.target * 100) : 100;
-    const animate = last && state.lineAnimatedFor !== last.date;
-    if (animate) { state.lineAnimatedFor = last.date; save(); }
+    const animate = shouldDrawLine('progress', last);
     html(`<div class="screen"><div class="grow">
       <p class="eyebrow">Progress · compared only to your own past</p><h1 class="title">The line, in full.</h1>
       <div class="line-wrap">${lineSVG(r, { h: 220, animate })}</div>

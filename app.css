@@ -229,10 +229,24 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .tabbar a[aria-current="page"]{color:var(--text);}
 .tabbar a .spark{stroke:var(--up);}
 .tabbar a[aria-current="page"] .spark{stroke:var(--up);stroke-width:2.4;}
-/* the selected background slides to the new tab instead of blinking across */
+/* the selected background slides to the new tab instead of blinking across.
+   A glass lens: it blurs what sits behind it, catches a specular edge along the top,
+   and casts a small shadow so it reads as a layer above the bar rather than a tint in it. */
 .tabpill{
-  position:absolute;left:0;top:6px;height:44px;border-radius:12px;pointer-events:none;opacity:0;
-  background:var(--line);background:color-mix(in srgb,var(--text) 8%,transparent);
+  position:absolute;left:0;top:6px;height:44px;border-radius:14px;pointer-events:none;opacity:0;
+  background:var(--line);
+  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.07));
+  backdrop-filter:blur(16px) saturate(180%);
+  -webkit-backdrop-filter:blur(16px) saturate(180%);
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -1px 0 rgba(255,255,255,.05),0 4px 14px rgba(0,0,0,.35);
+}
+@media (prefers-color-scheme: light){
+  .tabpill{
+    background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.62));
+    border-color:rgba(0,0,0,.07);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 3px 12px rgba(0,0,0,.12);
+  }
 }
 @media (prefers-reduced-motion: no-preference){
   .tabpill.ready{transition:transform .3s cubic-bezier(.34,1.35,.64,1),width .3s cubic-bezier(.34,1.35,.64,1),opacity .15s ease;}
@@ -271,6 +285,7 @@ dialog.sheet .btn{margin-top:16px;}
 }
 @media (prefers-reduced-transparency: reduce){
   .tabbar{background:var(--ground);backdrop-filter:none;-webkit-backdrop-filter:none;}
+  .tabpill{background:var(--line);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;}
 }
 /* ---------- route transitions ----------
    Outgoing leaves 8px in the direction of travel; incoming arrives from 8px the

@@ -1,5 +1,5 @@
 /* The Line — preview service worker. Scope follows the folder it is served from. */
-const VERSION = 'the-line-v3';
+const VERSION = 'the-line-v4';
 const PRECACHE = [
   './', './index.html', './app.css', './app.js', './store.js', './engine.js',
   './country-config.js', './analytics.js', './manifest.webmanifest',
