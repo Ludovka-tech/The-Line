@@ -29,6 +29,14 @@
     el.textContent = msg; el.hidden = false; el.onclick = () => { el.hidden = true; };
     clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 4000);
   }
+  /* a save is acknowledged on the button itself, then the screen changes */
+  function succeed(btn, then) {
+    if (!btn) { then(); return; }
+    btn.classList.add('ok');
+    btn.setAttribute('aria-label', 'Saved');
+    btn.innerHTML = '<svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg>';
+    setTimeout(then, 500);
+  }
   function openSheet(key) {
     const ex = E.explain(state, key); if (!ex) return;
     document.getElementById('sheetTitle').textContent = ex.title;
@@ -38,15 +46,52 @@
   document.getElementById('sheetClose').addEventListener('click', () => sheet.close ? sheet.close() : sheet.removeAttribute('open'));
   sheet.addEventListener('click', e => { if (e.target === sheet && sheet.close) sheet.close(); });
 
+  /* ---------- prominent figures count to their new value ---------- */
+  const shownNum = {};                       /* last value displayed this session, per key */
+  function countTo(el) {
+    const to = parseFloat(el.getAttribute('data-count'));
+    if (isNaN(to)) return;
+    const key = el.getAttribute('data-count-key');
+    const o = { dp: el.hasAttribute('data-count-dp') ? parseInt(el.getAttribute('data-count-dp'), 10) : 2, sign: el.hasAttribute('data-count-sign') };
+    const post = el.getAttribute('data-count-post') || '';
+    const write = v => { el.textContent = f(v, o) + post; };
+    const from = shownNum[key] === undefined ? 0 : shownNum[key];
+    shownNum[key] = to;
+    if (reduced() || from === to) { write(to); return; }
+    const t0 = performance.now(), ms = 700;
+    const step = now => {
+      const p = Math.min(1, (now - t0) / ms);
+      write(from + (to - from) * (1 - Math.pow(1 - p, 3)));   /* ease-out */
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);   /* the final value is already rendered, so a frozen rAF leaves it correct */
+  }
+  const countAll = () => $$('[data-count]').forEach(countTo);
+
+  /* ---------- bars grow to their value rather than appearing filled ---------- */
+  const shownBar = {};
+  function fillBar(el) {
+    const to = parseFloat(el.getAttribute('data-bar'));
+    if (isNaN(to)) return;
+    const key = el.getAttribute('data-bar-key');
+    const from = shownBar[key] === undefined ? 0 : shownBar[key];
+    shownBar[key] = to;
+    if (reduced() || from === to) { el.style.width = to + '%'; return; }
+    el.style.width = from + '%';
+    void el.offsetWidth;                       /* commit the start width before transitioning */
+    el.style.width = to + '%';
+  }
+  const fillAll = () => $$('[data-bar]').forEach(fillBar);
+
   /* ---------- the line ---------- */
   function lineSVG(readings, opts) {
     opts = opts || {};
     const W = 386, H = opts.h || 170, padX = 6, padT = 14, padB = 22;
     if (readings.length < 2) {
-      const y = H / 2;
-      return `<svg class="line" viewBox="0 0 ${W} ${H}" role="img" aria-label="${readings.length ? 'One reading so far.' : 'No readings yet.'}">
-        <line class="base" x1="${padX}" y1="${y}" x2="${W - padX}" y2="${y}"/>
-        ${readings.length ? `<circle class="dot" cx="${W - padX - 4}" cy="${y}" r="4.5"/><text x="${W - padX - 4}" y="${y + 20}" text-anchor="end">${esc(E.shortDate(readings[0].date))}</text>` : ''}
+      const y = H / 2, one = readings.length === 1;
+      return `<svg class="line" viewBox="0 0 ${W} ${H}" role="img" aria-label="${one ? 'One reading so far.' : 'No readings yet.'}">
+        <line class="base${one ? '' : ' idle'}" x1="${padX}" y1="${y}" x2="${W - padX}" y2="${y}"/>
+        ${one ? `<circle class="dot idle${opts.animate ? ' pop' : ''}" cx="${W - padX - 4}" cy="${y}" r="4.5"/><text x="${W - padX - 4}" y="${y + 20}" text-anchor="end">${esc(E.shortDate(readings[0].date))}</text>` : ''}
       </svg>`;
     }
     const vals = readings.map(r => r.total);
@@ -88,8 +133,36 @@
     el.setAttribute('points', r.map((x, i) => `${(3 + i / (r.length - 1) * 18).toFixed(1)},${(19 - (x.total - min) / (max - min) * 14).toFixed(1)}`).join(' '));
   }
 
+  /* ---------- tab bar: one selected background, moved rather than redrawn ---------- */
+  const tabnav = tabbar.querySelector('nav');
+  const pill = document.createElement('div');
+  pill.className = 'tabpill'; pill.setAttribute('aria-hidden', 'true');
+  tabnav.insertBefore(pill, tabnav.firstChild);
+  function labelWidth(a) {
+    const t = Array.prototype.filter.call(a.childNodes, n => n.nodeType === 3 && n.textContent.trim())[0];
+    if (!t) return 24;
+    const r = document.createRange(); r.selectNodeContents(t);
+    return r.getBoundingClientRect().width;
+  }
+  function movePill() {
+    const a = tabnav.querySelector('a[aria-current="page"]');
+    if (tabbar.hidden || !a) { pill.style.opacity = '0'; return; }
+    const nav = tabnav.getBoundingClientRect(), box = a.getBoundingClientRect();
+    if (!box.width) { pill.style.opacity = '0'; return; }          /* not laid out yet */
+    const w = Math.min(Math.round(box.width) - 6, Math.round(Math.max(24, labelWidth(a))) + 22);
+    pill.style.width = w + 'px';
+    pill.style.transform = 'translateX(' + Math.round(box.left - nav.left + (box.width - w) / 2) + 'px)';
+    pill.style.opacity = '1';
+    if (!pill.classList.contains('ready')) { void pill.offsetWidth; pill.classList.add('ready'); }
+  }
+  window.addEventListener('resize', movePill);
+  try { document.fonts.ready.then(movePill); } catch (e) { /* the pill is already placed without it */ }
+
   /* ---------- router ---------- */
   const routes = {};
+  const TAB_ORDER = ['home', 'check', 'plan', 'progress', 'settings'];
+  const TAB_OF = { networth: 'home', reminders: 'settings', about: 'settings' };
+  let shownRoute = null, leaveT = null;
   function parse() {
     const h = location.hash || '#/home';
     const [path, q] = h.slice(1).split('?');
@@ -97,10 +170,14 @@
     return { path: path || '/home', query };
   }
   function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
+  function routeName(path, query) {
+    const name = path.replace(/^\//, '') || 'home';
+    return (name.indexOf('import') === 0 || query.import) ? 'import' : name;
+  }
   function render() {
     const { path, query } = parse();
-    let name = path.replace(/^\//, '') || 'home';
-    if (name.indexOf('import') === 0 || query.import) name = 'import';
+    const name = routeName(path, query);
+    view.classList.remove('rt-leave');           /* never paint a screen mid-exit */
     if (!state.onboarded && !['start', 'import', 'networth', 'about'].includes(name)) { location.hash = '#/start'; return; }
     const fn = routes[name] || routes.home;
     view.innerHTML = '';
@@ -110,9 +187,39 @@
     tabbar.hidden = !state.onboarded || ['start', 'import', 'payday', 'rematch'].includes(name);
     tabbar.querySelectorAll('a').forEach(a => { const tab = a.getAttribute('data-tab'); const on = tab === name || (tab === 'home' && name === 'networth') || (tab === 'settings' && ['reminders', 'about'].includes(name)); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     updateSparkIcon();
+    movePill();
+    countAll();
+    fillAll();
+    shownRoute = name;
     if (window.flTrack) window.flTrack('app-screen', { screen: name });
   }
-  window.addEventListener('hashchange', render);
+
+  /* travel direction: where the incoming screen comes from, in px */
+  function travel(from, to) {
+    const i = TAB_ORDER.indexOf(TAB_OF[from] || from), j = TAB_ORDER.indexOf(TAB_OF[to] || to);
+    return (i < 0 || j < 0 || i === j || j > i) ? 8 : -8;
+  }
+  /* incoming screen arrives from dx; also used by screens that swap in place */
+  function playEnter(dx) {
+    view.classList.remove('rt-enter');
+    view.style.setProperty('--rt-dx', dx + 'px');
+    void view.offsetWidth;                       /* restart the animation */
+    view.classList.add('rt-enter');
+  }
+  function navigate() {
+    const { path, query } = parse();
+    const next = routeName(path, query);
+    clearTimeout(leaveT);                        /* a re-tap cancels the exit in flight */
+    if (shownRoute === null || next === shownRoute) { render(); return; }
+    const dx = travel(shownRoute, next);
+    view.classList.remove('rt-enter');
+    const arrive = () => { view.classList.remove('rt-leave'); render(); playEnter(dx); };
+    if (reduced()) { arrive(); return; }         /* opacity-only, no leave delay */
+    view.style.setProperty('--rt-dx', (-dx) + 'px');
+    view.classList.add('rt-leave');
+    leaveT = setTimeout(arrive, 120);
+  }
+  window.addEventListener('hashchange', navigate);
   const html = s => { view.innerHTML = s; };
   const $ = sel => view.querySelector(sel);
   const $$ = sel => Array.from(view.querySelectorAll(sel));
@@ -218,14 +325,15 @@
     const recalc = () => { const t = E.readingTotals(collect(A), collect(L)); $('#nwA').textContent = f(t.assetsTotal); $('#nwL').textContent = f(t.liabilitiesTotal); $('#nwT').textContent = f(t.total); };
     const collect = list => { const o = {}; list.forEach(x => { const v = val('nw_' + x[0]); if (v !== null) o[x[0]] = v; }); return o; };
     on('input', 'input', recalc); recalc();
-    on('#nwSave', 'click', () => {
+    on('#nwSave', 'click', e => {
       const assets = collect(A), liabilities = collect(L);
       if (!Object.keys(assets).length && !Object.keys(liabilities).length) { toast('Enter at least one number — an estimate is fine.'); return; }
       const t = E.readingTotals(assets, liabilities), date = S.today();
       state.readings = state.readings.filter(r => r.date !== date);
       state.readings.push(Object.assign({ date, assets, liabilities }, t)); state.readings.sort((a, b) => a.date < b.date ? -1 : 1);
       if (!state.rematch.due) state.rematch.due = E.addMonths(state.readings[0].date, 6);
-      state.lineAnimatedFor = null; state.onboarded = true; state.createdAt = state.createdAt || date; save(); go('#/home');
+      state.lineAnimatedFor = null; state.onboarded = true; state.createdAt = state.createdAt || date; save();
+      succeed(e.currentTarget, () => go('#/home'));
     });
     on('#nwSkip', 'click', () => { state.onboarded = true; state.createdAt = state.createdAt || S.today(); save(); go('#/home'); });
     on('#nwCancel', 'click', () => go('#/home'));
@@ -242,7 +350,7 @@
     const focusNow = E.focusLabel(state.focus || E.focusForStep(E.currentStep(state)));
     html(`<div class="screen"><div class="grow">
       <p class="eyebrow">Net worth${last ? ' · ' + esc(E.shortDate(last.date)) : ''}</p>
-      ${last ? `<p class="hero-num">${f(last.total)}</p>` : `<p class="hero-num dim">—</p>`}
+      ${last ? `<p class="hero-num" data-count="${last.total}" data-count-key="nw">${f(last.total)}</p>` : `<p class="hero-num dim">—</p>`}
       ${ch ? `<p class="delta ${ch.dir}"><button class="tapnum" type="button" data-explain="change">${esc(ch.text)}</button></p>` : last ? `<p class="small dim">One reading so far — the second one is where this gets interesting.</p>` : `<p class="small dim">No reading yet. The first one takes two minutes.</p>`}
       <div class="line-wrap">${lineSVG(r, { animate })}</div>
       ${enc ? `<p class="hand">${esc(enc)}</p>` : ''}
@@ -307,22 +415,25 @@
       ${light ? '' : `<label class="field" for="ckNote"><span class="label">What surprised you?</span><textarea id="ckNote" class="hand" rows="2" placeholder="optional"></textarea></label>`}
     </div><div class="bottom"><button class="btn primary" type="button" id="ckSave">Save check</button><button class="btn ghost" type="button" data-go="#/home">Not now</button></div></div>`);
     on('[data-go]', 'click', e => go(e.currentTarget.getAttribute('data-go')));
-    on('#ckSave', 'click', () => {
+    on('#ckSave', 'click', e => {
       const left = val('ckLeft'), inn = val('ckIn'), out = val('ckOut');
       if (left === null && inn === null && out === null) { toast('One number is enough.'); return; }
       const c = { date: S.today(), in: inn, out, left, note: (document.getElementById('ckNote') || {}).value || '', wants: val('ckWants'), unassigned: val('ckUnassigned') };
       state.checks = state.checks.filter(x => x.date !== c.date); state.checks.push(c); save();
-      const obs = E.observation(state.checks, sym());
-      const target = E.leftForVariable(state);
-      html(`<div class="screen"><div class="grow">
-        <p class="eyebrow">Saved</p>
-        ${left !== null ? `<p class="hero-num">${f(left)}</p><p class="small dim">left this week</p>` : `<p class="hero-num">${f(inn || 0)} → ${f(out || 0)}</p><p class="small dim">in and out</p>`}
-        ${target !== null && left !== null && method === 'pyf' ? `<p class="small dim" style="margin-top:14px;">Your plan leaves about ${f(target)} a month for everything variable. <button class="tapnum" type="button" data-explain="left">How that's worked out</button></p>` : ''}
-        ${obs ? `<div class="note">${esc(obs)}</div>` : ''}
-        ${c.note ? `<p class="hand" style="margin-top:20px;">“${esc(c.note)}”</p>` : ''}
-      </div><div class="bottom"><button class="btn" type="button" data-go="#/home">Done</button></div></div>`);
-      on('[data-go]', 'click', e => go(e.currentTarget.getAttribute('data-go')));
-      on('[data-explain]', 'click', e => openSheet(e.currentTarget.getAttribute('data-explain')));
+      succeed(e.currentTarget, () => {
+        const obs = E.observation(state.checks, sym());
+        const target = E.leftForVariable(state);
+        html(`<div class="screen"><div class="grow">
+          <p class="eyebrow">Saved</p>
+          ${left !== null ? `<p class="hero-num" data-count="${left}" data-count-key="ckleft">${f(left)}</p><p class="small dim">left this week</p>` : `<p class="hero-num">${f(inn || 0)} → ${f(out || 0)}</p><p class="small dim">in and out</p>`}
+          ${target !== null && left !== null && method === 'pyf' ? `<p class="small dim" style="margin-top:14px;">Your plan leaves about ${f(target)} a month for everything variable. <button class="tapnum" type="button" data-explain="left">How that's worked out</button></p>` : ''}
+          ${obs ? `<div class="note">${esc(obs)}</div>` : ''}
+          ${c.note ? `<p class="hand" style="margin-top:20px;">“${esc(c.note)}”</p>` : ''}
+        </div><div class="bottom"><button class="btn" type="button" data-go="#/home">Done</button></div></div>`);
+        playEnter(8); countAll();
+        on('[data-go]', 'click', ev => go(ev.currentTarget.getAttribute('data-go')));
+        on('[data-explain]', 'click', ev => openSheet(ev.currentTarget.getAttribute('data-explain')));
+      });
     });
   };
 
@@ -408,16 +519,18 @@
     const r = state.readings, p = state.plan, ef = E.efStages(state), ds = E.debtSpeed(p.debt), step = E.currentStep(state);
     const first = r[0], last = r[r.length - 1];
     const pctEf = ef.next ? Math.min(100, ef.current / ef.next.target * 100) : 100;
+    const animate = last && state.lineAnimatedFor !== last.date;
+    if (animate) { state.lineAnimatedFor = last.date; save(); }
     html(`<div class="screen"><div class="grow">
       <p class="eyebrow">Progress · compared only to your own past</p><h1 class="title">The line, in full.</h1>
-      <div class="line-wrap">${lineSVG(r, { h: 220 })}</div>
-      ${first && last && r.length > 1 ? `<div class="kv"><span class="dim">Since ${esc(E.shortDate(first.date))}</span><span class="v ${last.total - first.total > 0 ? 'up' : last.total - first.total < 0 ? 'down' : ''}">${f(last.total - first.total, { sign: true })}</span></div>` : ''}
+      <div class="line-wrap">${lineSVG(r, { h: 220, animate })}</div>
+      ${first && last && r.length > 1 ? `<div class="kv"><span class="dim">Since ${esc(E.shortDate(first.date))}</span><span class="v ${last.total - first.total > 0 ? 'up' : last.total - first.total < 0 ? 'down' : ''}" data-count="${last.total - first.total}" data-count-key="since" data-count-sign="1">${f(last.total - first.total, { sign: true })}</span></div>` : ''}
       <ul class="readings">${r.slice().reverse().slice(0, 6).map(x => `<li><span class="d">${esc(E.shortDate(x.date))}</span><span class="n">${f(x.total)}</span></li>`).join('') || '<li class="empty">No readings yet.</li>'}</ul>
       <button class="btn quiet" type="button" data-go="#/networth" style="margin-top:12px;">${r.length ? 'Add a reading' : 'Take the first reading'}</button>
 
       <div class="section"><h2>Emergency fund</h2>
-        ${ef.next ? `<div class="kv"><span>Next: ${esc(ef.next.label)}</span><span class="v"><button class="tapnum" type="button" data-explain="ef">${f(ef.current)} of ${f(ef.next.target)}</button></span></div>
-        <div class="bar" role="img" aria-label="${Math.round(pctEf)} percent of the next stage"><i style="width:${pctEf.toFixed(1)}%"></i></div>
+        ${ef.next ? `<div class="kv"><span>Next: ${esc(ef.next.label)}</span><span class="v"><button class="tapnum" type="button" data-explain="ef" data-count="${ef.current}" data-count-key="ef" data-count-post=" of ${esc(f(ef.next.target))}">${f(ef.current)} of ${f(ef.next.target)}</button></span></div>
+        <div class="bar${pctEf < 1 ? ' empty' : ''}" role="img" aria-label="${Math.round(pctEf)} percent of the next stage"><i data-bar="${pctEf.toFixed(1)}" data-bar-key="ef" style="width:${pctEf.toFixed(1)}%"></i></div>
         <div class="milestones">${ef.stages.map(s => `<span>${esc(s.label)} ${f(s.target, { dp: 0 })}</span>`).join('')}</div>
         ${ef.monthsToNext !== null ? `<p class="caption" style="margin-top:8px;">${ef.monthsToNext === 0 ? 'There.' : ef.monthsToNext + (ef.monthsToNext === 1 ? ' month' : ' months') + ' at ' + f(p.transferAmount) + ' a month.'}</p>` : p.transferAmount ? '' : '<p class="caption" style="margin-top:8px;">Set a transfer in the plan to see when the next stage lands.</p>'}` : `<p class="body dim small">${ef.current ? 'Past every stage that\'s set. Set a target in the plan if you want another.' : 'No savings yet — the first €50 is the hardest. The buffer comes first: €500.'}</p>`}
       </div>

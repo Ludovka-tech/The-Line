@@ -95,10 +95,18 @@ svg.line .gap{stroke:var(--text-dim);stroke-dasharray:3 5;stroke-width:1.5;fill:
 svg.line .base{stroke:var(--line);stroke-width:1;}
 svg.line text{font-family:var(--mono);font-size:0.6471rem;fill:var(--text-dim);}
 @media (prefers-reduced-motion: no-preference){
-  svg.line .path.draw{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw 1.1s cubic-bezier(.4,0,.2,1) forwards;}
-  svg.line .fill.draw{opacity:0;animation:fadein .6s .8s forwards;}
+  svg.line .path.draw{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw .6s cubic-bezier(.4,0,.2,1) forwards;}
+  svg.line .fill.draw{opacity:0;animation:fadein .45s .35s forwards;}
   @keyframes draw{to{stroke-dashoffset:0;}}
   @keyframes fadein{to{opacity:.08;}}
+  /* a lone reading lands rather than appears, then waits visibly for the second one */
+  svg.line .dot{transform-box:fill-box;transform-origin:center;}
+  svg.line .dot.pop{animation:dot-pop .4s cubic-bezier(.2,.9,.3,1) both;}
+  svg.line .dot.idle{animation:idle-pulse 2s ease-in-out infinite;}
+  svg.line .dot.pop.idle{animation:dot-pop .4s cubic-bezier(.2,.9,.3,1) both,idle-pulse 2s ease-in-out .4s infinite;}
+  svg.line .base.idle{animation:idle-pulse 2s ease-in-out infinite;}
+  @keyframes dot-pop{0%{opacity:0;transform:scale(0);}60%{opacity:1;transform:scale(1.15);}100%{opacity:1;transform:scale(1);}}
+  @keyframes idle-pulse{0%,100%{opacity:1;}50%{opacity:.7;}}
 }
 
 /* ---------- controls (HIG: 44pt targets) ---------- */
@@ -113,6 +121,13 @@ svg.line text{font-family:var(--mono);font-size:0.6471rem;fill:var(--text-dim);}
 .btn.ghost{background:transparent;color:var(--text-dim);font-weight:500;min-height:44px;}
 .btn.danger{background:transparent;color:var(--down);border:1px solid var(--line);}
 .btn[disabled]{opacity:.45;cursor:default;}
+/* a save is acknowledged on the button itself before the screen changes */
+.btn.ok{background:var(--up);color:var(--on-up);pointer-events:none;}
+.btn .tick{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}
+@media (prefers-reduced-motion: no-preference){
+  .btn .tick{stroke-dasharray:22;stroke-dashoffset:22;animation:tick-in .22s cubic-bezier(.4,0,.2,1) .06s forwards;}
+  @keyframes tick-in{to{stroke-dashoffset:0;}}
+}
 .btn + .btn{margin-top:10px;}
 .row-btns{display:flex;gap:10px;}
 .row-btns .btn{flex:1;}
@@ -155,6 +170,14 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .choice .sub{font-size:0.8235rem;color:var(--text-dim);}
 .choice[aria-pressed="true"]{border-color:var(--text);}
 
+/* press feedback — a tappable card answers the finger before anything else happens.
+   .btn already has its own press state, so it is left alone. */
+.choice:active,.seg button:active{transform:scale(.975);opacity:.9;}
+@media (prefers-reduced-motion: no-preference){
+  .choice,.seg button,.row.tap{transition:transform .15s cubic-bezier(.34,1.3,.64,1),opacity .15s ease;}
+  .choice:active,.seg button:active,.row.tap:active{transition-duration:.09s;transition-timing-function:ease-out;}
+}
+
 /* list rows (settings, plan) */
 .rows{border-top:1px solid var(--line);}
 .row{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:54px;padding:10px 0;border-bottom:1px solid var(--line);text-align:left;width:100%;text-decoration:none;}
@@ -165,7 +188,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .row .v select{min-height:44px;font-family:var(--sans);max-width:100%;}
 .row .v.on{color:var(--text);}
 .row .chev{color:var(--text-dim);margin-left:-6px;}
-.row.tap:active{opacity:.7;}
+.row.tap:active{opacity:.7;transform:scale(.99);}
 
 /* one quiet observation, never an instruction */
 .note{border-left:2px solid var(--line);padding:6px 14px;margin:18px 0 0;color:var(--text-dim);font-size:0.8824rem;}
@@ -175,6 +198,10 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 /* progress bars — one colour, labelled */
 .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:8px 0 4px;}
 .bar > i{display:block;height:100%;background:var(--up);border-radius:3px;}
+@media (prefers-reduced-motion: no-preference){
+  .bar > i{transition:width .55s cubic-bezier(.2,.75,.35,1);}
+  .bar.empty{animation:idle-pulse 2s ease-in-out infinite;}   /* nothing in it yet, but waiting rather than broken */
+}
 .milestones{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:0.7647rem;color:var(--text-dim);font-family:var(--mono);}
 .milestones span{white-space:nowrap;}
 .section{margin-top:30px;}
@@ -192,15 +219,26 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
   border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
-.tabbar nav{max-width:430px;margin:0 auto;display:flex;height:56px;}
+.tabbar nav{max-width:430px;margin:0 auto;display:flex;height:56px;position:relative;}
 .tabbar a{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
   text-decoration:none;color:var(--text-dim);font-size:0.6471rem;font-weight:500;min-width:44px;
+  position:relative;z-index:1;
 }
 .tabbar a svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 .tabbar a[aria-current="page"]{color:var(--text);}
 .tabbar a .spark{stroke:var(--up);}
 .tabbar a[aria-current="page"] .spark{stroke:var(--up);stroke-width:2.4;}
+/* the selected background slides to the new tab instead of blinking across */
+.tabpill{
+  position:absolute;left:0;top:6px;height:44px;border-radius:12px;pointer-events:none;opacity:0;
+  background:var(--line);background:color-mix(in srgb,var(--text) 8%,transparent);
+}
+@media (prefers-reduced-motion: no-preference){
+  .tabpill.ready{transition:transform .3s cubic-bezier(.34,1.35,.64,1),width .3s cubic-bezier(.34,1.35,.64,1),opacity .15s ease;}
+  .tabbar a{transition:color .1s ease;}       /* the label keeps up with the pill, never lags it */
+  .tabbar a .spark{transition:stroke-width .1s ease;}
+}
 
 /* ---------- sheet (how was this calculated) ---------- */
 dialog.sheet{
@@ -234,5 +272,19 @@ dialog.sheet .btn{margin-top:16px;}
 @media (prefers-reduced-transparency: reduce){
   .tabbar{background:var(--ground);backdrop-filter:none;-webkit-backdrop-filter:none;}
 }
+/* ---------- route transitions ----------
+   Outgoing leaves 8px in the direction of travel; incoming arrives from 8px the
+   other way. Declared after the blanket reduced-motion rule above so the
+   opacity-only fallback can win the !important tie on specificity. */
+main#view.rt-leave{opacity:0;transform:translateX(var(--rt-dx,0px));transition:opacity 120ms ease-in,transform 120ms ease-in;}
+@media (prefers-reduced-motion: no-preference){
+  main#view.rt-enter{animation:rt-in 180ms cubic-bezier(.2,.75,.35,1) both;}
+  @keyframes rt-in{from{opacity:0;transform:translateX(var(--rt-dx,0px));}to{opacity:1;transform:none;}}
+}
+@media (prefers-reduced-motion: reduce){
+  main#view.rt-enter{animation:rt-fade 150ms linear both !important;}
+  @keyframes rt-fade{from{opacity:0;}to{opacity:1;}}
+}
+
 /* a title receives focus on each screen change for screen readers; no ring for pointer users */
 .title:focus,.hero-num:focus,.eyebrow:focus{outline:none;}
