@@ -150,24 +150,70 @@
   const pill = document.createElement('div');
   pill.className = 'tabpill'; pill.setAttribute('aria-hidden', 'true');
   tabnav.insertBefore(pill, tabnav.firstChild);
-  function labelWidth(a) {
-    const t = Array.prototype.filter.call(a.childNodes, n => n.nodeType === 3 && n.textContent.trim())[0];
-    if (!t) return 24;
-    const r = document.createRange(); r.selectNodeContents(t);
-    return r.getBoundingClientRect().width;
+  /* the union of the icon and the label — the thing the pill should actually sit behind.
+     Measured rather than assumed, so a large system font size can't push the label out of it. */
+  function tabContent(a) {
+    let b = null;
+    const add = r => {
+      if (!r || !r.width) return;
+      b = b ? { l: Math.min(b.l, r.left), r: Math.max(b.r, r.right), t: Math.min(b.t, r.top), b: Math.max(b.b, r.bottom) }
+            : { l: r.left, r: r.right, t: r.top, b: r.bottom };
+    };
+    const svg = a.querySelector('svg');
+    if (svg) add(svg.getBoundingClientRect());
+    const tn = Array.prototype.filter.call(a.childNodes, n => n.nodeType === 3 && n.textContent.trim())[0];
+    if (tn) { const rg = document.createRange(); rg.selectNodeContents(tn); add(rg.getBoundingClientRect()); }
+    return b;
   }
   function movePill() {
     const a = tabnav.querySelector('a[aria-current="page"]');
     if (tabbar.hidden || !a) { pill.style.opacity = '0'; return; }
-    const nav = tabnav.getBoundingClientRect(), box = a.getBoundingClientRect();
-    if (!box.width) { pill.style.opacity = '0'; return; }          /* not laid out yet */
-    const w = Math.min(Math.round(box.width) - 6, Math.round(Math.max(24, labelWidth(a))) + 22);
+    const nav = tabnav.getBoundingClientRect(), tab = a.getBoundingClientRect(), c = tabContent(a);
+    if (!tab.width || !c) { pill.style.opacity = '0'; return; }    /* not laid out yet */
+    const w = Math.min(Math.round(tab.width) - 6, Math.round(c.r - c.l) + 22);
+    const h = Math.min(Math.round(tab.height) - 4, Math.round(c.b - c.t) + 10);
     pill.style.width = w + 'px';
-    pill.style.transform = 'translateX(' + Math.round(box.left - nav.left + (box.width - w) / 2) + 'px)';
+    pill.style.height = h + 'px';
+    pill.style.transform = 'translate(' + Math.round((c.l + c.r) / 2 - w / 2 - nav.left) + 'px,'
+                                        + Math.round((c.t + c.b) / 2 - h / 2 - nav.top) + 'px)';
     pill.style.opacity = '1';
     if (!pill.classList.contains('ready')) { void pill.offsetWidth; pill.classList.add('ready'); }
   }
-  window.addEventListener('resize', movePill);
+
+  /* ---------- segmented controls: a thumb that slides, not a fill that jumps ---------- */
+  const segPos = {};                          /* last thumb box per control, so it slides across a re-render */
+  function moveSegPill(seg) {
+    const p = seg.querySelector('.segpill'), on = seg.querySelector('button[aria-pressed="true"]');
+    if (!p) return;
+    const sr = seg.getBoundingClientRect(), br = on && on.getBoundingClientRect();
+    if (!on || !br.width) { p.style.opacity = '0'; return; }
+    const cs = getComputedStyle(seg);
+    const to = { x: Math.round(br.left - sr.left - (parseFloat(cs.borderLeftWidth) || 0)),
+                 y: Math.round(br.top - sr.top - (parseFloat(cs.borderTopWidth) || 0)),
+                 w: Math.round(br.width), h: Math.round(br.height) };
+    const key = seg.getAttribute('aria-label') || 'seg', from = segPos[key];
+    segPos[key] = to;
+    const put = b => { p.style.width = b.w + 'px'; p.style.height = b.h + 'px'; p.style.transform = 'translate(' + b.x + 'px,' + b.y + 'px)'; };
+    const slide = from && !reduced() && (from.x !== to.x || from.w !== to.w);
+    p.classList.remove('ready');
+    put(slide ? from : to);
+    void p.offsetWidth;                        /* commit the start box before transitioning */
+    p.classList.add('ready');
+    p.style.opacity = '1';
+    if (slide) put(to);
+  }
+  function segPills() {
+    $$('.seg').forEach(seg => {
+      if (!seg.querySelector('.segpill')) {
+        const p = document.createElement('i');
+        p.className = 'segpill'; p.setAttribute('aria-hidden', 'true');
+        seg.insertBefore(p, seg.firstChild);
+        seg.classList.add('has-thumb');        /* without JS the solid pressed state stays */
+      }
+      moveSegPill(seg);
+    });
+  }
+  window.addEventListener('resize', () => { movePill(); $$('.seg').forEach(moveSegPill); });
   try { document.fonts.ready.then(movePill); } catch (e) { /* the pill is already placed without it */ }
 
   /* ---------- router ---------- */
@@ -186,14 +232,14 @@
     const name = path.replace(/^\//, '') || 'home';
     return (name.indexOf('import') === 0 || query.import) ? 'import' : name;
   }
-  function render() {
+  function render(keepScroll) {
     const { path, query } = parse();
     const name = routeName(path, query);
     view.classList.remove('rt-leave');           /* never paint a screen mid-exit */
     if (!state.onboarded && !['start', 'import', 'networth', 'about'].includes(name)) { location.hash = '#/start'; return; }
     const fn = routes[name] || routes.home;
     view.innerHTML = '';
-    view.scrollTop = 0; window.scrollTo(0, 0);
+    if (!keepScroll) { view.scrollTop = 0; window.scrollTo(0, 0); }
     fn(query);
     const t = view.querySelector('.title') || view.querySelector('.hero-num') || view.querySelector('.eyebrow'); if (t) { t.setAttribute('tabindex', '-1'); t.focus({ preventScroll: true }); }
     tabbar.hidden = !state.onboarded || ['start', 'import', 'payday', 'rematch'].includes(name);
@@ -202,6 +248,7 @@
     movePill();
     countAll();
     fillAll();
+    segPills();
     shownRoute = name; shownStep = query.q || '';
     if (window.flTrack) window.flTrack('app-screen', { screen: name });
   }
@@ -383,8 +430,8 @@
     on('[data-sig]', 'click', e => applySignal(JSON.parse(e.currentTarget.getAttribute('data-sig'))));
   };
   function applySignal(a) {
-    if (a.type === 'lower') { state.plan.transferAmount = a.amount; save(); toast('Transfer set to ' + f(a.amount) + '. Changing the number isn\'t starting over.'); render(); }
-    else if (a.type === 'switch') { state.method = a.to; save(); toast('Method: ' + E.METHODS[a.to] + '. Changing method isn\'t starting over — everything carries across.'); render(); }
+    if (a.type === 'lower') { state.plan.transferAmount = a.amount; save(); toast('Transfer set to ' + f(a.amount) + '. Changing the number isn\'t starting over.'); render(true); }
+    else if (a.type === 'switch') { state.method = a.to; save(); toast('Method: ' + E.METHODS[a.to] + '. Changing method isn\'t starting over — everything carries across.'); render(true); }
     else if (a.type === 'route') go(a.route);
   }
 
@@ -424,10 +471,10 @@
       <p class="eyebrow">Weekly check · ${esc(E.DAYS[new Date().getDay()])}</p>
       <h1 class="title">${light ? 'One number.' : 'Three numbers.'}</h1>
       <p class="body dim small">Rough is right. Round to the nearest ten.</p>
-      ${light ? '' : field('ckIn', 'Came in this week', null) + field('ckOut', 'Went out', null)}
-      ${field('ckLeft', "What's left", null)}
-      ${!light && method === '503020' ? field('ckWants', 'Roughly how much went on wants?', null, { hint: 'Restaurants, clothes, going out. A guess is fine.' }) : ''}
-      ${!light && method === 'zero' ? field('ckUnassigned', 'Anything unassigned?', null, { hint: 'Zero is the goal. A number here is just information.' }) : ''}
+      ${light ? '' : field('ckIn', 'Came in this week', null, { compact: true }) + field('ckOut', 'Went out', null, { compact: true })}
+      ${field('ckLeft', "What's left", null, { compact: true })}
+      ${!light && method === '503020' ? field('ckWants', 'Roughly how much went on wants?', null, { compact: true, hint: 'Restaurants, clothes, going out. A guess is fine.' }) : ''}
+      ${!light && method === 'zero' ? field('ckUnassigned', 'Anything unassigned?', null, { compact: true, hint: 'Zero is the goal. A number here is just information.' }) : ''}
       ${light ? '' : `<label class="field" for="ckNote"><span class="label">What surprised you?</span><textarea id="ckNote" class="hand" rows="2" placeholder="optional"></textarea></label>`}
     </div><div class="bottom"><button class="btn primary" type="button" id="ckSave">Save check</button><button class="btn ghost" type="button" data-go="#/home">Not now</button></div></div>`);
     on('[data-go]', 'click', e => go(e.currentTarget.getAttribute('data-go')));
@@ -513,7 +560,7 @@
       state.focus = E.focusForStep(state.plan.step);
       save(); syncFocusUi();
     });
-    on('[data-method]', 'click', e => { state.method = e.currentTarget.getAttribute('data-method'); save(); toast('Method: ' + E.METHODS[state.method] + '. Nothing was reset.'); render(); });
+    on('[data-method]', 'click', e => { state.method = e.currentTarget.getAttribute('data-method'); save(); toast('Method: ' + E.METHODS[state.method] + '. Nothing was reset.'); render(true); });
     on('[data-explain]', 'click', e => openSheet(e.currentTarget.getAttribute('data-explain')));
     on('#plSave', 'click', () => {
       const pl = state.plan;
@@ -619,9 +666,9 @@
       </div>
     </div></div>`);
     on('#stPayday', 'change', e => { s.payday.day = parseInt(e.target.value, 10); save(); });
-    on('#stIrregular', 'click', () => { s.payday.irregular = !s.payday.irregular; state.plan.irregular = s.payday.irregular; save(); render(); });
+    on('#stIrregular', 'click', () => { s.payday.irregular = !s.payday.irregular; state.plan.irregular = s.payday.irregular; save(); render(true); });
     on('#stWeekly', 'change', e => { s.weeklyDay = parseInt(e.target.value, 10); save(); });
-    on('[data-cur]', 'click', e => { s.currency = e.currentTarget.getAttribute('data-cur'); save(); render(); });
+    on('[data-cur]', 'click', e => { s.currency = e.currentTarget.getAttribute('data-cur'); save(); render(true); });
     on('#stCountry', 'change', e => { s.country = e.target.value; save(); });
     on('#stJson', 'click', () => { S.download(S.exportJSON(state), 'the-line-export.json', 'application/json'); state.exportedAt = S.today(); save(); toast('Exported.'); });
     on('#stCsv', 'click', () => { S.download(S.exportCSV(state), 'the-line-export.csv', 'text/csv;charset=utf-8'); state.exportedAt = S.today(); save(); toast('Exported.'); });
@@ -653,7 +700,7 @@
         ${installed ? (perm === 'granted' ? '<p class="body small dim">Allowed. Reminders that arrive while the app is closed need a server that doesn\'t exist yet — until then the calendar files above do the job, and the app shows what\'s due whenever it opens.</p>' : perm === 'denied' ? '<p class="body small dim">Blocked in your device settings. The calendar files above work regardless.</p>' : '<p class="body small dim">Allow notifications and the app can nudge you when something is due while it\'s open.</p><button class="btn quiet" type="button" id="rmPerm">Allow notifications</button>') : '<p class="body small dim">iPhone only allows reminders from apps on your home screen. Add this app there first (Share → Add to Home Screen) — takes 5 seconds — then come back here.</p>'}
       </div>
     </div></div>`);
-    on('[data-rem]', 'click', e => { const k = e.currentTarget.getAttribute('data-rem'); s.reminders[k] = !s.reminders[k]; save(); render(); });
+    on('[data-rem]', 'click', e => { const k = e.currentTarget.getAttribute('data-rem'); s.reminders[k] = !s.reminders[k]; save(); render(true); });
     on('[data-ics]', 'click', e => downloadIcs(e.currentTarget.getAttribute('data-ics')));
     on('#rmPerm', 'click', () => { Notification.requestPermission().then(() => render()); });
   };
